@@ -1,5 +1,8 @@
+import os
 import asyncio
 
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
@@ -11,18 +14,27 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
+from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram import F
 
+API_TOKEN = os.getenv("API_TOKEN", "8771446004:AAG1y0Po9QnbOwTIcR4dk6cr5XV0IvyViuw")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "super_secret")  # любая строка
 
-API_TOKEN = "8771446004:AAG1y0Po9QnbOwTIcR4dk6cr5XV0IvyViuw"
+# URL Railway, который ты пришлёшь (без окончания /webhook)
+RAILWAY_URL = os.getenv("RAILWAY_URL", "https://tg-floret-bot.up.railway.app")
+WEBHOOK_PATH = f"/webhook/{WEBHOOK_SECRET}"
+WEBHOOK_URL = RAILWAY_URL + WEBHOOK_PATH
 
+# FastAPI-приложение
+app = FastAPI()
 
-bot = Bot(token=API_TOKEN)
+# Сессия и объекты бота
+session = AiohttpSession()
+bot = Bot(token=API_TOKEN, session=session)
 dp = Dispatcher()
-
 
 # Mini App каталога
 catalog_webapp = WebAppInfo(url="https://floret-msk.ru/")
-
 
 # Нижние кнопки
 kb = ReplyKeyboardMarkup(
@@ -39,7 +51,6 @@ kb = ReplyKeyboardMarkup(
     resize_keyboard=True,
 )
 
-
 WELCOME_TEXT = (
     "Добро пожаловать! 🌸\n"
     "Вы в официальном телеграм-боте салона цветов Floret в Черёмушках.\n\n"
@@ -54,12 +65,9 @@ WELCOME_TEXT = (
 )
 
 
-
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message):
     photo = FSInputFile("floret_welcome.jpg")
-
-
     await message.answer_photo(
         photo=photo,
         caption=WELCOME_TEXT,
@@ -67,56 +75,69 @@ async def cmd_start(message: types.Message):
     )
 
 
+@dp.message(F.text.contains("ПОДДЕРЖКА"))
+async def support_handler(message: types.Message):
+    kb_support = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="ОТКРЫТЬ ЧАТ С МЕНЕДЖЕРОМ",
+                    url="https://t.me/floretsalon",
+                )
+            ]
+        ]
+    )
+    await message.answer(
+        "Нажмите кнопку ниже, чтобы открыть чат с менеджером.",
+        reply_markup=kb_support,
+    )
+
+
+@dp.message(F.text.contains("БЫСТРЫЙ ЗАКАЗ"))
+async def fast_order_handler(message: types.Message):
+    kb_fast = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="НАПИСАТЬ МЕНЕДЖЕРУ",
+                    url="https://t.me/floretsalon",
+                )
+            ]
+        ]
+    )
+    await message.answer(
+        "Для быстрого заказа нажмите кнопку ниже и напишите, что хотите.",
+        reply_markup=kb_fast,
+    )
+
 
 @dp.message()
-async def handle_buttons(message: types.Message):
-    text = message.text or ""
+async def fallback_handler(message: types.Message):
+    await message.answer("Чтобы начать, нажмите одну из кнопок ниже.")
 
 
-    if "ПОДДЕРЖКА" in text:
-        kb_support = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="ОТКРЫТЬ ЧАТ С МЕНЕДЖЕРОМ",
-                        url="https://t.me/floretsalon",
-                    )
-                ]
-            ]
-        )
-        await message.answer(
-            "Нажмите кнопку ниже, чтобы открыть чат с менеджером.",
-            reply_markup=kb_support,
-        )
+@app.on_event("startup")
+async def on_startup():
+    # Устанавливаем webhook при старте FastAPI
+    await bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True)
 
 
-    elif "БЫСТРЫЙ ЗАКАЗ" in text:
-        kb_fast = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="НАПИСАТЬ МЕНЕДЖЕРУ",
-                        url="https://t.me/floretsalon",
-                    )
-                ]
-            ]
-        )
-        await message.answer(
-            "Для быстрого заказа нажмите кнопку ниже и напишите, что хотите.",
-            reply_markup=kb_fast,
-        )
+@app.on_event("shutdown")
+async def on_shutdown():
+    await bot.delete_webhook()
+    await session.close()
 
 
-    else:
-        # Кнопка каталога сама открывает Mini App, поэтому тут просто подсказка
-        await message.answer("Чтобы начать, нажмите одну из кнопок ниже.")
+@app.post(WEBHOOK_PATH)
+async def telegram_webhook(request: Request):
+    # Получаем апдейт от Telegram и передаём его в Dispatcher
+    data = await request.json()
+    update = types.Update(**data)
+    await dp.feed_update(bot, update)
+    return JSONResponse({"ok": True})
 
 
-
-async def main():
-    await dp.start_polling(bot)
-
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+# Опциональный health-check
+@app.get("/")
+async def root():
+    return {"status": "ok"}
