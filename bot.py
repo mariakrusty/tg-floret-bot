@@ -13,7 +13,7 @@ from aiogram.types import (
 )
 
 
-API_TOKEN = "8771446004:AAH7w6wp-H07iruHAkQua7vbs82v43oydFU"
+API_TOKEN = "8771446004:AAH2Fjpgjb490yNQ49_BZYy8Fch2T-zNpc4"
 
 
 bot = Bot(token=API_TOKEN)
