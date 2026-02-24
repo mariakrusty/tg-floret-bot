@@ -1,20 +1,24 @@
-import asyncio
+import logging
 
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import CommandStart
+from aiogram.dispatcher.filters import CommandStart
 from aiogram.types import (
     ReplyKeyboardMarkup,
     KeyboardButton,
-    FSInputFile,
+    InputFile,
     WebAppInfo,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
+from aiogram.utils import executor
+
 
 API_TOKEN = "8771446004:AAH7w6wp-H07iruHAkQua7vbs82v43oydFU"
 
+logging.basicConfig(level=logging.INFO)
+
 bot = Bot(token=API_TOKEN)
-dp = Dispatcher()
+dp = Dispatcher(bot)
 
 # Mini App каталога
 catalog_webapp = WebAppInfo(url="https://floret-msk.ru/")
@@ -48,10 +52,9 @@ WELCOME_TEXT = (
 )
 
 
-@dp.message(CommandStart())
+@dp.message_handler(CommandStart())
 async def cmd_start(message: types.Message):
-    photo = FSInputFile("floret_welcome.jpg")
-
+    photo = InputFile("floret_welcome.jpg")
     await message.answer_photo(
         photo=photo,
         caption=WELCOME_TEXT,
@@ -59,7 +62,7 @@ async def cmd_start(message: types.Message):
     )
 
 
-@dp.message()
+@dp.message_handler()
 async def handle_buttons(message: types.Message):
     text = message.text or ""
 
@@ -96,13 +99,8 @@ async def handle_buttons(message: types.Message):
         )
 
     else:
-        # Кнопка каталога сама открывает Mini App, поэтому тут просто подсказка
         await message.answer("Чтобы начать, нажмите одну из кнопок ниже.")
 
 
-async def main():
-    await dp.start_polling(bot)
-
-
 if __name__ == "__main__":
-    asyncio.run(main())
+    executor.start_polling(dp, skip_updates=True)
