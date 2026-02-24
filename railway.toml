@@ -1,0 +1,2 @@
+[deploy]
+runtime = "python:3.11"
