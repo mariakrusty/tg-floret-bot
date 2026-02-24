@@ -1,27 +1,28 @@
-import logging
+import asyncio
+
 
 from aiogram import Bot, Dispatcher, types
-from aiogram.dispatcher.filters import CommandStart
+from aiogram.filters import CommandStart
 from aiogram.types import (
     ReplyKeyboardMarkup,
     KeyboardButton,
-    InputFile,
+    FSInputFile,
     WebAppInfo,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
-from aiogram.utils import executor
 
 
 API_TOKEN = "8771446004:AAH7w6wp-H07iruHAkQua7vbs82v43oydFU"
 
-logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=API_TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher()
+
 
 # Mini App каталога
 catalog_webapp = WebAppInfo(url="https://floret-msk.ru/")
+
 
 # Нижние кнопки
 kb = ReplyKeyboardMarkup(
@@ -38,6 +39,7 @@ kb = ReplyKeyboardMarkup(
     resize_keyboard=True,
 )
 
+
 WELCOME_TEXT = (
     "Добро пожаловать! 🌸\n"
     "Вы в официальном телеграм-боте салона цветов Floret в Черёмушках.\n\n"
@@ -52,9 +54,12 @@ WELCOME_TEXT = (
 )
 
 
-@dp.message_handler(CommandStart())
+
+@dp.message(CommandStart())
 async def cmd_start(message: types.Message):
-    photo = InputFile("floret_welcome.jpg")
+    photo = FSInputFile("floret_welcome.jpg")
+
+
     await message.answer_photo(
         photo=photo,
         caption=WELCOME_TEXT,
@@ -62,9 +67,11 @@ async def cmd_start(message: types.Message):
     )
 
 
-@dp.message_handler()
+
+@dp.message()
 async def handle_buttons(message: types.Message):
     text = message.text or ""
+
 
     if "ПОДДЕРЖКА" in text:
         kb_support = InlineKeyboardMarkup(
@@ -82,6 +89,7 @@ async def handle_buttons(message: types.Message):
             reply_markup=kb_support,
         )
 
+
     elif "БЫСТРЫЙ ЗАКАЗ" in text:
         kb_fast = InlineKeyboardMarkup(
             inline_keyboard=[
@@ -98,9 +106,17 @@ async def handle_buttons(message: types.Message):
             reply_markup=kb_fast,
         )
 
+
     else:
+        # Кнопка каталога сама открывает Mini App, поэтому тут просто подсказка
         await message.answer("Чтобы начать, нажмите одну из кнопок ниже.")
 
 
+
+async def main():
+    await dp.start_polling(bot)
+
+
+
 if __name__ == "__main__":
-    executor.start_polling(dp, skip_updates=True)
+    asyncio.run(main())
